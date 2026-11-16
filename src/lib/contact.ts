@@ -9,8 +9,16 @@ export const contactSchema = z.object({
 
 export type ContactInput = z.infer<typeof contactSchema>;
 
-export function buildMailto(to: string, data: ContactInput): string {
-  const subject = `[GENZIQ] ${data.topic || "Hello"} — from ${data.name}`;
-  const body = `${data.message}\n\n— ${data.name} (${data.email})`;
-  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+export function buildContactSubmission(data: ContactInput) {
+  const topic = data.topic.replace(/[\r\n]/g, " ").trim() || "Hello";
+  const name = data.name.replace(/[\r\n]/g, " ").trim();
+
+  return {
+    name,
+    email: data.email,
+    replyto: data.email,
+    subject: `[GENZIQ] ${topic} — from ${name}`,
+    message: `Topic: ${topic}\n\n${data.message}`,
+    from_name: "GENZIQ Website",
+  };
 }

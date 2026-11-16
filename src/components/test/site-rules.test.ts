@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { STATIONS, stationForPath } from "@/components/universe/stations";
-import { buildMailto, contactSchema } from "@/lib/contact";
+import { buildContactSubmission, contactSchema } from "@/lib/contact";
 import { SITE } from "@/lib/site";
 
 describe("site stations", () => {
   it("has the five launch pages plus Careers", () => {
-    expect(STATIONS.map((s) => s.path)).toEqual(["/", "/about", "/products", "/innovation", "/careers", "/contact"]);
+    expect(STATIONS.map((s) => s.path)).toEqual([
+      "/",
+      "/about",
+      "/products",
+      "/innovation",
+      "/careers",
+      "/contact",
+    ]);
   });
 
   it("maps each page (with or without trailing slash) to its own station", () => {
@@ -19,7 +26,12 @@ describe("site stations", () => {
 
 describe("contact form", () => {
   it("rejects an invalid email", () => {
-    const r = contactSchema.safeParse({ name: "A", email: "nope", topic: "", message: "Hello there GENZIQ" });
+    const r = contactSchema.safeParse({
+      name: "A",
+      email: "nope",
+      topic: "",
+      message: "Hello there GENZIQ",
+    });
     expect(r.success).toBe(false);
   });
 
@@ -29,10 +41,27 @@ describe("contact form", () => {
     expect(contactSchema.safeParse({ ...base, message: "   " }).success).toBe(false);
   });
 
-  it("builds a mailto addressed to the inbox with the sender in the body", () => {
-    const url = buildMailto("hello@genziq.com", { name: "Ria", email: "ria@x.io", topic: "Feedback", message: "Love it" });
-    expect(url.startsWith("mailto:hello@genziq.com?subject=")).toBe(true);
-    expect(decodeURIComponent(url)).toContain("ria@x.io");
+  it("sets the visitor as the reply-to and includes their details", () => {
+    const submission = buildContactSubmission({
+      name: "Ria",
+      email: "ria@x.io",
+      topic: "Feedback",
+      message: "Love it",
+    });
+    expect(submission.replyto).toBe("ria@x.io");
+    expect(submission.email).toBe("ria@x.io");
+    expect(submission.subject).toContain("Feedback");
+    expect(submission.message).toContain("Love it");
+  });
+
+  it("removes line breaks from the subject fields", () => {
+    const submission = buildContactSubmission({
+      name: "Ria\nTeam",
+      email: "ria@x.io",
+      topic: "Feedback\r\nFollow-up",
+      message: "Love it",
+    });
+    expect(submission.subject).not.toMatch(/[\r\n]/);
   });
 });
 

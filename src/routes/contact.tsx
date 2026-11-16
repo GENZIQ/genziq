@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Send, Mail } from "lucide-react";
 import { toast } from "sonner";
 
@@ -8,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageIntro, Section } from "@/components/site/PageIntro";
 import { labState } from "@/components/universe/lab-state";
-import { buildMailto, contactSchema } from "@/lib/contact";
+import { contactSchema } from "@/lib/contact";
+import { submitContactMessage } from "@/lib/contact-server";
 import { SITE } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -31,10 +33,13 @@ const TOPICS = ["Say hello", "AI services", "Collaboration", "Product idea", "Fe
 function Contact() {
   const [topic, setTopic] = useState(TOPICS[0]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const sendContactMessage = useServerFn(submitContactMessage);
 
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const parsed = contactSchema.safeParse({
       name: fd.get("name"),
       email: fd.get("email"),
@@ -48,9 +53,23 @@ function Contact() {
       return;
     }
     setErrors({});
-    labState.pulseAt = performance.now();
-    window.location.href = buildMailto(SITE.email, parsed.data);
-    toast.success("Signal ready", { description: "Your email app should open with the message filled in." });
+    setIsSubmitting(true);
+
+    try {
+      await sendContactMessage({ data: parsed.data });
+      labState.pulseAt = performance.now();
+      form.reset();
+      setTopic(TOPICS[0]);
+      toast.success("Message sent", {
+        description: "Thanks for reaching out. We'll get back to you soon.",
+      });
+    } catch {
+      toast.error("Message not sent", {
+        description: `Please try again later or email ${SITE.email} directly.`,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const field = "mt-2 rounded-xl border-border bg-glass-strong";
@@ -71,6 +90,10 @@ function Contact() {
         <a href={`mailto:${SITE.email}`} className="mt-6 inline-flex items-center gap-2 font-mono text-sm text-aurora hover:underline">
           <Mail className="h-4 w-4" /> {SITE.email}
         </a>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your message is sent through Web3Forms.{" "}
+          Your email address will be used so we can reply to you.
+        </p>
       </PageIntro>
 
       <Section className="-mt-24 md:-mt-40">
@@ -110,8 +133,14 @@ function Contact() {
             <Textarea name="message" rows={5} className={field} aria-invalid={!!errors["message"]} />
             {errors["message"] && <span className="mt-1 block text-xs text-destructive">{errors["message"]}</span>}
           </label>
-          <Button type="submit" variant="hero" size="xl" className="mt-7">
-            Transmit <Send />
+          <Button
+            type="submit"
+            variant="hero"
+            size="xl"
+            className="mt-7"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Sending..." : "Transmit"} <Send />
           </Button>
         </form>
       </Section>
